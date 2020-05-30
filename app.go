@@ -192,7 +192,7 @@ func New(settings ...*Settings) *App {
 			getString = getStringImmutable
 		}
 	}
-	if app.Settings.StartupCallback == nil && app.Settings.DisableStartupMessage {
+	if app.Settings.StartupCallback == nil && !app.Settings.DisableStartupMessage {
 		app.Settings.StartupCallback = StartupMessage
 	}
 
