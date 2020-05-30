@@ -94,6 +94,9 @@ type Settings struct {
 	// When set to true, it will not print out the fiber ASCII and "listening" on message
 	DisableStartupMessage bool
 
+	// Register your own startup message, default is the fiber ASCII and listening on message
+	StartupCallback func(ln net.Listener)
+
 	// Templates is the interface that wraps the Render function.
 	Templates Templates
 
@@ -189,6 +192,10 @@ func New(settings ...*Settings) *App {
 			getString = getStringImmutable
 		}
 	}
+	if app.Settings.StartupCallback == nil && app.Settings.DisableStartupMessage {
+		app.Settings.StartupCallback = StartupMessage
+	}
+
 	// Initialize app
 	return app.init()
 }
@@ -302,8 +309,7 @@ func (app *App) Serve(ln net.Listener, tlsconfig ...*tls.Config) error {
 	}
 	// Print listening message
 	if !app.Settings.DisableStartupMessage {
-		fmt.Printf("        _______ __\n  ____ / ____(_) /_  ___  _____\n_____ / /_  / / __ \\/ _ \\/ ___/\n  __ / __/ / / /_/ /  __/ /\n    /_/   /_/_.___/\\___/_/ v%s\n", Version)
-		fmt.Printf("Started listening on %s\n", ln.Addr().String())
+		app.Settings.StartupCallback(ln)
 	}
 	return app.server.Serve(ln)
 }
@@ -343,8 +349,7 @@ func (app *App) Listen(address interface{}, tlsconfig ...*tls.Config) error {
 	}
 	// Print listening message
 	if !app.Settings.DisableStartupMessage && !utils.GetArgument("-child") {
-		fmt.Printf("        _______ __\n  ____ / ____(_) /_  ___  _____\n_____ / /_  / / __ \\/ _ \\/ ___/\n  __ / __/ / / /_/ /  __/ /\n    /_/   /_/_.___/\\___/_/ v%s\n", Version)
-		fmt.Printf("Started listening on %s\n", ln.Addr().String())
+		app.Settings.StartupCallback(ln)
 	}
 	return app.server.Serve(ln)
 }
@@ -509,4 +514,9 @@ func (app *App) init() *App {
 	app.server.IdleTimeout = app.Settings.IdleTimeout
 	app.mutex.Unlock()
 	return app
+}
+
+func StartupMessage(ln net.Listener) {
+	fmt.Printf("        _______ __\n  ____ / ____(_) /_  ___  _____\n_____ / /_  / / __ \\/ _ \\/ ___/\n  __ / __/ / / /_/ /  __/ /\n    /_/   /_/_.___/\\___/_/ v%s\n", Version)
+	fmt.Printf("Started listening on %s\n", ln.Addr().String())
 }
