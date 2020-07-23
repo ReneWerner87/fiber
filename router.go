@@ -125,7 +125,7 @@ func (app *App) next(ctx *Ctx) bool {
 	return false
 }
 
-func (app *App) handler(rctx *fasthttp.RequestCtx) {
+func (app *App) handler(rctx *RequestCtx) {
 	// Acquire Ctx with fasthttp request from pool
 	ctx := app.AcquireCtx(rctx)
 	// Prettify path
@@ -284,10 +284,10 @@ func (app *App) registerStatic(prefix, root string, config ...Static) Route {
 			fs.IndexNames = []string{config[0].Index}
 		}
 	}
-	fileHandler := fs.NewRequestHandler()
+	//fileHandler := fs.NewRequestHandler()
 	handler := func(c *Ctx) {
 		// Serve file
-		fileHandler(c.Fasthttp)
+		//fileHandler(c.Fasthttp)
 		// Return request if found and not forbidden
 		status := c.Fasthttp.Response.StatusCode()
 		if status != StatusNotFound && status != StatusForbidden {

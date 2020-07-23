@@ -33,18 +33,18 @@ import (
 // Ctx represents the Context which hold the HTTP request and response.
 // It has methods for the request query string, parameters, body, HTTP headers and so on.
 type Ctx struct {
-	app          *App                 // Reference to *App
-	route        *Route               // Reference to *Route
-	indexRoute   int                  // Index of the current route
-	indexHandler int                  // Index of the current handler
-	method       string               // HTTP method
-	methodINT    int                  // HTTP method INT equivalent
-	path         string               // Prettified HTTP path
-	pathOriginal string               // Original HTTP path
-	values       []string             // Route parameter values
-	err          error                // Contains error if passed to Next
-	Fasthttp     *fasthttp.RequestCtx // Reference to *fasthttp.RequestCtx
-	matched      bool                 // Non use route matched
+	app          *App        // Reference to *App
+	route        *Route      // Reference to *Route
+	indexRoute   int         // Index of the current route
+	indexHandler int         // Index of the current handler
+	method       string      // HTTP method
+	methodINT    int         // HTTP method INT equivalent
+	path         string      // Prettified HTTP path
+	pathOriginal string      // Original HTTP path
+	values       []string    // Route parameter values
+	err          error       // Contains error if passed to Next
+	Fasthttp     *RequestCtx // Reference to *fasthttp.RequestCtx
+	matched      bool        // Non use route matched
 }
 
 // Range data for ctx.Range
@@ -80,7 +80,7 @@ type Views interface {
 }
 
 // AcquireCtx retrieves a new Ctx from the pool.
-func (app *App) AcquireCtx(fctx *fasthttp.RequestCtx) *Ctx {
+func (app *App) AcquireCtx(fctx *RequestCtx) *Ctx {
 	ctx := app.pool.Get().(*Ctx)
 	// Set app reference
 	ctx.app = app
@@ -926,7 +926,7 @@ func (ctx *Ctx) SendFile(file string, compress ...bool) error {
 	// Save status code
 	status := ctx.Fasthttp.Response.StatusCode()
 	// Serve file
-	sendFileHandler(ctx.Fasthttp)
+	//sendFileHandler(ctx.Fasthttp)
 	// Get the status code which is set by fasthttp
 	fsStatus := ctx.Fasthttp.Response.StatusCode()
 	// Set the status code set by the user if it is different from the fasthttp status code and 200

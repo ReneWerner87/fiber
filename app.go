@@ -56,7 +56,7 @@ type App struct {
 	// Ctx pool
 	pool sync.Pool
 	// Fasthttp server
-	server *fasthttp.Server
+	server *Server
 	// App settings
 	Settings *Settings `json:"settings"`
 }
@@ -477,30 +477,16 @@ func (app *App) Listen(address interface{}, tlsconfig ...*tls.Config) error {
 	if app.Settings.Prefork {
 		return app.prefork(addr, tlsconfig...)
 	}
-	// Set correct network protocol
-	network := "tcp4"
-	if isIPv6(addr) {
-		network = "tcp6"
-	}
-	// Setup listener
-	ln, err := net.Listen(network, addr)
-	if err != nil {
-		return err
-	}
-	// Add TLS config if provided
-	if len(tlsconfig) > 0 {
-		ln = tls.NewListener(ln, tlsconfig[0])
-	}
 	// Print startup message
 	if !app.Settings.DisableStartupMessage {
-		app.startupMessage(ln.Addr().String(), len(tlsconfig) > 0, "")
+		app.startupMessage(addr, len(tlsconfig) > 0, "")
 	}
 	// Start listening
-	return app.server.Serve(ln)
+	return serve(app, addr)
 }
 
 // Handler returns the server handler.
-func (app *App) Handler() fasthttp.RequestHandler {
+func (app *App) Handler() RequestHandler {
 	return app.handler
 }
 
@@ -603,10 +589,8 @@ func (app *App) init() *App {
 		}
 	}
 	if app.server == nil {
-		app.server = &fasthttp.Server{
-			Logger:       &disableLogger{},
-			LogAllErrors: false,
-			ErrorHandler: func(fctx *fasthttp.RequestCtx, err error) {
+		app.server = &Server{
+			ErrorHandler: func(fctx *RequestCtx, err error) {
 				ctx := app.AcquireCtx(fctx)
 				if _, ok := err.(*fasthttp.ErrSmallBuffer); ok {
 					ctx.err = ErrRequestHeaderFieldsTooLarge
