@@ -8,7 +8,10 @@ import (
 	"bytes"
 	"fmt"
 	"hash/crc32"
+	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +19,19 @@ import (
 	bytebufferpool "github.com/valyala/bytebufferpool"
 	fasthttp "github.com/valyala/fasthttp"
 )
+
+// readContent opens a named file and read content from it
+func readContent(rf io.ReaderFrom, name string) (n int64, err error) {
+	// Read file
+	f, err := os.Open(filepath.Clean(name))
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		err = f.Close()
+	}()
+	return rf.ReadFrom(f)
+}
 
 // quoteString escape special characters in a given string
 func quoteString(raw string) string {
@@ -163,14 +179,19 @@ func getOffer(header string, offers ...string) string {
 	return ""
 }
 
-// Adapted from:
-// https://github.com/jshttp/fresh/blob/10e0471669dbbfbfd8de65bc6efac2ddd0bfa057/index.js#L110
-func parseTokenList(noneMatchBytes []byte) []string {
-	var (
-		start int
-		end   int
-		list  []string
-	)
+func matchEtag(s string, etag string) bool {
+	if s == etag || s == "W/"+etag || "W/"+s == etag {
+		return true
+	}
+
+	return false
+}
+
+func isEtagStale(etag string, noneMatchBytes []byte) bool {
+	var start, end int
+
+	// Adapted from:
+	// https://github.com/jshttp/fresh/blob/10e0471669dbbfbfd8de65bc6efac2ddd0bfa057/index.js#L110
 	for i := range noneMatchBytes {
 		switch noneMatchBytes[i] {
 		case 0x20:
@@ -179,7 +200,9 @@ func parseTokenList(noneMatchBytes []byte) []string {
 				end = i + 1
 			}
 		case 0x2c:
-			list = append(list, getString(noneMatchBytes[start:end]))
+			if matchEtag(getString(noneMatchBytes[start:end]), etag) {
+				return false
+			}
 			start = i + 1
 			end = i + 1
 		default:
@@ -187,8 +210,7 @@ func parseTokenList(noneMatchBytes []byte) []string {
 		}
 	}
 
-	list = append(list, getString(noneMatchBytes[start:end]))
-	return list
+	return !matchEtag(getString(noneMatchBytes[start:end]), etag)
 }
 
 func isIPv6(address string) bool {
@@ -200,6 +222,34 @@ func parseAddr(raw string) (host, port string) {
 		return raw[:i], raw[i+1:]
 	}
 	return raw, ""
+}
+
+const noCacheValue = "no-cache"
+
+// isNoCache checks if the cacheControl header value is a `no-cache`.
+func isNoCache(cacheControl string) bool {
+	i := strings.Index(cacheControl, noCacheValue)
+	if i == -1 {
+		return false
+	}
+
+	// Xno-cache
+	if i > 0 && !(cacheControl[i-1] == ' ' || cacheControl[i-1] == ',') {
+		return false
+	}
+
+	// bla bla, no-cache
+	if i+len(noCacheValue) == len(cacheControl) {
+		return true
+	}
+
+	// bla bla, no-cacheX
+	if cacheControl[i+len(noCacheValue)] != ',' {
+		return false
+	}
+
+	// OK
+	return true
 }
 
 // https://golang.org/src/net/net.go#L113
@@ -214,7 +264,6 @@ func (a testAddr) String() string {
 }
 
 type testConn struct {
-	net.Conn
 	r bytes.Buffer
 	w bytes.Buffer
 }
