@@ -37,16 +37,18 @@ type Router interface {
 // Route is a struct that holds all metadata for each registered handler
 type Route struct {
 	// Data for routing
+	pos int // Position in stack -> important for the sort of the matched routes
+
 	use         bool        // USE matches path prefixes
 	star        bool        // Path equals '*'
 	root        bool        // Path equals '/'
 	path        string      // Prettified path
-	routeParser routeParser // Parameter parser
+	routeParser routeParser // Parameter parser -> REMOVE
 
 	// Public fields
 	Method   string    `json:"method"` // HTTP method
 	Path     string    `json:"path"`   // Original registered route path
-	Params   []string  `json:"params"` // Case sensitive param keys
+	Params   []string  `json:"params"` // Case sensitive param keys  -> REMOVE
 	Handlers []Handler `json:"-"`      // Ctx handlers
 }
 
@@ -85,6 +87,9 @@ func (r *Route) match(path, original string) (match bool, values []string) {
 func (app *App) next(ctx *Ctx) bool {
 	// Get stack length
 	lenr := len(app.stack[ctx.methodINT]) - 1
+
+	// TODO: use the tree and find all the routes for the given path
+	// TODO: sort routes by the positions
 	// Loop over the route stack starting from previous index
 	for ctx.indexRoute < lenr {
 		// Increment route index
@@ -176,8 +181,8 @@ func (app *App) register(method, pathRaw string, handlers ...Handler) Route {
 	// Is path a root slash?
 	var isRoot = pathPretty == "/"
 	// Parse path parameters
-	var parsedRaw = parseRoute(pathRaw)
-	var parsedPretty = parseRoute(pathPretty)
+	//var parsedRaw = parseRoute(pathRaw)
+	//var parsedPretty = parseRoute(pathPretty)
 
 	// Create route metadata without pointer
 	route := Route{
@@ -186,15 +191,17 @@ func (app *App) register(method, pathRaw string, handlers ...Handler) Route {
 		star: isStar,
 		root: isRoot,
 		// Path data
-		path:        pathPretty,
-		routeParser: parsedPretty,
-		Params:      parsedRaw.params,
+		//path:        pathPretty,
+		//routeParser: parsedPretty,
+		//Params:      parsedRaw.params,
 
 		// Public data
 		Path:     pathRaw,
 		Method:   method,
 		Handlers: handlers,
 	}
+	// TODO: register route in tree
+
 	// Increment global handler count
 	app.mutex.Lock()
 	app.handlerCount += len(handlers)
@@ -334,6 +341,11 @@ func (app *App) addRoute(method string, route *Route) {
 		preRoute := app.stack[m][l-1]
 		preRoute.Handlers = append(preRoute.Handlers, route.Handlers...)
 	} else {
+		// Increment global route position
+		app.mutex.Lock()
+		app.routesCount++
+		app.mutex.Unlock()
+		route.pos = app.routesCount
 		route.Method = method
 		// Add route to the stack
 		app.stack[m] = append(app.stack[m], route)

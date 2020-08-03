@@ -30,21 +30,39 @@ import (
 	fasthttp "github.com/valyala/fasthttp"
 )
 
+const (
+	maxRoutes = 16
+	maxParams = 16
+)
+
+// TODO: add a pool for paramBags
+type ParamBag struct {
+	//names      [maxParams]string -> in route instance ?
+	values     [maxParams]string
+	paramCount int
+}
+
 // Ctx represents the Context which hold the HTTP request and response.
 // It has methods for the request query string, parameters, body, HTTP headers and so on.
 type Ctx struct {
 	app          *App                 // Reference to *App
-	route        *Route               // Reference to *Route
-	indexRoute   int                  // Index of the current route
-	indexHandler int                  // Index of the current handler
+	route        *Route               // Reference to *Route  -> REMOVE: we should use the list of matched Routes
+	indexRoute   int                  // Index of the current route in the matched route stack
+	indexHandler int                  // Index of the current handler in the current used route -> maybe we don´t need this
 	method       string               // HTTP method
 	methodINT    int                  // HTTP method INT equivalent
 	path         string               // Prettified HTTP path
 	pathOriginal string               // Original HTTP path
-	values       []string             // Route parameter values
+	values       []string             // Route parameter values -> REMOVE: is stored in paramsBag
 	err          error                // Contains error if passed to Next
 	Fasthttp     *fasthttp.RequestCtx // Reference to *fasthttp.RequestCtx
-	matched      bool                 // Non use route matched
+	matched      bool                 // Non use route matched -> REMOVE: should be useless ? len(matchedRoutes) should be fine
+
+	matchedRoutes [maxRoutes]*Route // list of matched routes
+	// TODO: collect all matched routes and sort routes and params at the end
+	paramBags [maxRoutes]*ParamBag // params for the matched routes
+	// TODO: collect all the params
+	routeCount int // count of matched routes
 }
 
 // Range data for ctx.Range
@@ -107,6 +125,12 @@ func (app *App) ReleaseCtx(ctx *Ctx) {
 	ctx.values = nil
 	ctx.Fasthttp = nil
 	ctx.err = nil
+
+	// TODO: reset new properties
+	ctx.routeCount = 0
+	//ctx.matchedRoutes = ctx.matchedRoutes[:0]
+	//ctx.paramBags = ctx.paramBags[:0]
+
 	app.pool.Put(ctx)
 }
 
